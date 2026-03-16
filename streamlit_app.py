@@ -1124,14 +1124,23 @@ if (not is_moderator) and (prompt := st.chat_input("Напиши сообщен�
                         {"role": m["role"], "content": m["content"]}
                         for m in st.session_state.messages[-10:]
                     ]
-                    # Для аббревиатур (КБ, ИПР и т.п.): не даём GPT придумывать — только из базы знаний.
-                    if _looks_like_term_or_abbreviation_query(prompt) and not service.has_abbreviation_in_kb(prompt, history):
-                        response = _prepare_ticket_offer(
+                    # Вопросы про компанию — answer_with_meta (строго из БЗ, без выдумок). Болтовня — generate_reply.
+                    is_small_talk = _looks_like_small_talk(prompt)
+                    if not is_small_talk:
+                        result = service.answer_with_meta(
                             prompt,
-                            profile.get("role"),
-                            profile.get("circle"),
-                            st.session_state.chat_username,
+                            user_role=profile.get("role"),
+                            user_circle=profile.get("circle"),
                         )
+                        if result.get("needs_moderation") or _should_send_to_moderator(prompt, result):
+                            response = _prepare_ticket_offer(
+                                prompt,
+                                profile.get("role"),
+                                profile.get("circle"),
+                                st.session_state.chat_username,
+                            )
+                        else:
+                            response = result.get("answer", "") or ""
                     else:
                         response = service.generate_reply(
                             prompt,
