@@ -41,9 +41,15 @@ git push -u origin main
 ```toml
 OPENROUTER_API_KEY = "sk-or-v1-..."
 OPENROUTER_MODEL = "openai/gpt-4.1-mini"
+
+# Опционально: уведомления о новых тикетах в Mattermost
+MATTERMOST_BASE_URL = "https://mchat.pravo.tech"
+MATTERMOST_BOT_TOKEN = "mm-..."
+MATTERMOST_MODERATOR_CHANNEL_ID = "<id канала для тикетов>"
 ```
 
-Без ключа Buddy отвечает из базы знаний (без LLM).
+Без ключа Buddy отвечает из базы знаний (без LLM).  
+С Mattermost — при создании тикета модератору уходит уведомление в канал.
 
 ## Локальный запуск Streamlit
 

@@ -338,7 +338,9 @@ class StreamlitChatService:
             db.add(ticket)
             db.commit()
             db.refresh(ticket)
-            return int(ticket.id)
+            ticket_id = int(ticket.id)
+            _notify_mattermost_new_ticket(ticket_id=ticket_id, question=q, requester=requester)
+            return ticket_id
 
     def save_manual_knowledge(
         self,

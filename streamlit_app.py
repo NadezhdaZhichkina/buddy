@@ -1013,7 +1013,7 @@ if show_user_panel:
                 )
                 st.rerun()
 
-    with st.expander("Нужна помощь человека?", expanded=False):
+    with st.expander("Нужна помощь человека? Отправь вопрос модератору", expanded=True):
         current_notice = st.session_state.user_notices_by_user.get(current_user, "")
         if current_notice:
             st.success(current_notice)
