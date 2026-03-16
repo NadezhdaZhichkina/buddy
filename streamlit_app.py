@@ -688,6 +688,43 @@ if service.llm_enabled:
 else:
     st.info("LLM: выключен — ответы только по базе знаний. Добавь OPENROUTER_API_KEY в Secrets Streamlit Cloud.")
 
+with st.expander("Режим тестирования", expanded=True):
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.session_state.role_mode = st.radio(
+            "Роль",
+            options=["Пользователь", "Модератор"],
+            index=0 if st.session_state.get("role_mode", "Пользователь") == "Пользователь" else 1,
+            horizontal=True,
+        )
+    with col2:
+        current_user_index = 0
+        cu = st.session_state.get("chat_username", "user1")
+        if cu in DEMO_USERS:
+            current_user_index = list(DEMO_USERS).index(cu)
+        selected_user = st.selectbox(
+            "Пользователь",
+            options=list(DEMO_USERS),
+            index=current_user_index,
+            help="Под каким пользователем открыт чат.",
+        )
+        st.session_state.chat_username = selected_user.strip().lower() or "user1"
+    with col3:
+        moderator_username = st.text_input(
+            "Username модератора",
+            value=st.session_state.get("moderator_username", "nadezhda_zhichkina"),
+            help="Этому модератору приходят тикеты.",
+        ).strip().lower()
+        st.session_state.moderator_username = moderator_username or "nadezhda_zhichkina"
+    is_moderator = st.session_state.role_mode == "Модератор"
+    is_moderator = st.session_state.role_mode == "Модератор"
+    st.caption(
+        f"Чат: `{st.session_state.chat_username}` | Модератор: `{st.session_state.moderator_username}`"
+        + (f" | Тикетов: {len(service.list_moderation_tickets(include_closed=False))}" if is_moderator else "")
+    )
+
+is_moderator = st.session_state.get("role_mode", "Пользователь") == "Модератор"
+
 with st.expander("Диагностика LLM", expanded=False):
     st.write(
         {
@@ -705,43 +742,7 @@ if "moderator_username" not in st.session_state:
 if "role_mode" not in st.session_state:
     st.session_state.role_mode = "Пользователь"
 
-with st.sidebar:
-    st.subheader("Режим тестирования")
-    st.session_state.role_mode = st.radio(
-        "Роль",
-        options=["Пользователь", "Модератор"],
-        index=0 if st.session_state.role_mode == "Пользователь" else 1,
-    )
-    current_user_index = 0
-    if st.session_state.chat_username in DEMO_USERS:
-        current_user_index = list(DEMO_USERS).index(st.session_state.chat_username)
-    selected_user = st.selectbox(
-        "Пользователь",
-        options=list(DEMO_USERS),
-        index=current_user_index,
-        help="Выбери, под каким пользователем открыт чат.",
-    )
-    moderator_username = st.text_input(
-        "Username модератора",
-        value=st.session_state.moderator_username,
-        help="Этому модератору приходят тикеты.",
-    ).strip().lower()
-    st.session_state.chat_username = selected_user.strip().lower() or "user1"
-    st.session_state.moderator_username = moderator_username or "nadezhda_zhichkina"
-    is_moderator = st.session_state.role_mode == "Модератор"
-    st.caption(f"Пользователь чата: `{st.session_state.chat_username}`")
-    st.caption(f"Модератор тикетов: `{st.session_state.moderator_username}`")
-    if is_moderator:
-        st.success(f"Режим модератора под `{st.session_state.moderator_username}`")
-    else:
-        st.info(f"Режим пользователя под `{st.session_state.chat_username}`")
-
-    try:
-        pending_total = len(service.list_moderation_tickets(include_closed=False))
-    except Exception:
-        pending_total = 0
-    st.caption(f"Тикетов в очереди: **{pending_total}**")
-    st.caption(f"База: `{str(service.engine.url).replace('sqlite:///', '')}`")
+is_moderator = st.session_state.role_mode == "Модератор"
 if "messages_by_user" not in st.session_state:
     st.session_state.messages_by_user = {}
 if "profiles_by_user" not in st.session_state:
