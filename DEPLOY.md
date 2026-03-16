@@ -31,9 +31,9 @@ git push -u origin main
 Через 1–2 минуты появится ссылка вида:  
 `https://ТВОЙ-АПП.streamlit.app`
 
-## Шаг 3: Секреты (опционально)
+## Шаг 3: Секреты
 
-Для работы LLM (OpenRouter) добавь секреты в Streamlit Cloud:
+Для работы LLM и **сохранения тикетов и базы знаний** добавь секреты в Streamlit Cloud:
 
 1. В приложении на share.streamlit.io → **Settings** → **Secrets**
 2. Добавь в формате TOML:
@@ -42,14 +42,20 @@ git push -u origin main
 OPENROUTER_API_KEY = "sk-or-v1-..."
 OPENROUTER_MODEL = "openai/gpt-4.1-mini"
 
+# Обязательно для Streamlit Cloud: без PostgreSQL тикеты и база знаний не сохранятся!
+# Бесплатный PostgreSQL: Neon (neon.tech), Supabase, ElephantSQL
+STREAMLIT_DATABASE_URL = "postgresql://user:password@host:5432/dbname"
+
 # Опционально: уведомления о новых тикетах в Mattermost
 MATTERMOST_BASE_URL = "https://mchat.pravo.tech"
 MATTERMOST_BOT_TOKEN = "mm-..."
 MATTERMOST_MODERATOR_CHANNEL_ID = "<id канала для тикетов>"
 ```
 
-Без ключа Buddy отвечает из базы знаний (без LLM).  
-С Mattermost — при создании тикета модератору уходит уведомление в канал.
+- **Без STREAMLIT_DATABASE_URL:** используется SQLite в памяти — тикеты и ответы модератора в базу знаний **теряются при перезапуске**.
+- **С STREAMLIT_DATABASE_URL:** тикеты и обновления базы знаний (при ответе модератора) сохраняются постоянно.
+- **Без OPENROUTER_API_KEY:** Buddy отвечает только из базы знаний (без LLM).
+- **С Mattermost:** при создании тикета модератору уходит уведомление в канал.
 
 ## Локальный запуск Streamlit
 
@@ -63,5 +69,5 @@ streamlit run streamlit_app.py
 
 ## Примечания
 
-- **База данных:** на Streamlit Cloud используется SQLite в памяти — данные сбрасываются при перезапуске. База знаний заполняется при первом запуске.
+- **База данных:** без `STREAMLIT_DATABASE_URL` используется SQLite — тикеты и обновления базы знаний (при ответе модератора) не сохраняются между перезапусками. Добавь PostgreSQL через секрет `STREAMLIT_DATABASE_URL` — тогда тикеты и база знаний будут постоянными.
 - **FastAPI** (для Mattermost webhook) нужно деплоить отдельно (Render, Railway и т.п.), если нужна интеграция с Mattermost.

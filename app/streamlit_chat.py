@@ -590,6 +590,21 @@ class StreamlitChatService:
         scored = self._retrieve_candidates_with_scores(question, limit=1, history=history)
         return bool(scored) and scored[0][0] >= min_score
 
+    def has_abbreviation_in_kb(self, question: str, history: list[dict] | None = None) -> bool:
+        """Для запросов об аббревиатурах (КБ, ИПР и т.п.): есть ли в базе запись, где эта аббревиатура явно указана."""
+        if not _looks_like_abbreviation_query(question):
+            return True  # не запрос об аббревиатуре — пропускаем проверку
+        acronyms = _extract_upper_acronyms(question)
+        if not acronyms:
+            return True
+        scored = self._retrieve_candidates_with_scores(question, limit=5, history=history)
+        if not scored:
+            return False
+        for _, item in scored:
+            full = f"{(item.question or '').lower()} {(item.answer or '').lower()}"
+            if all(_contains_whole_token(full, acr) for acr in acronyms):
+                return True
+        return False
 
     def _answer_with_llm(
         self,
@@ -678,9 +693,16 @@ class StreamlitChatService:
         kb_block = ""
         if candidates:
             facts = [f"• {item.question} → {item.answer}" for item in candidates[:5]]
-            kb_block = "Факты из базы знаний (используй, если релевантны):\n" + "\n".join(facts)
+            kb_block = (
+                "Факты из базы знаний:\n" + "\n".join(facts)
+                + "\n\nДля вопросов про компанию, процессы, аббревиатуры: отвечай ТОЛЬКО если факт напрямую отвечает на вопрос. "
+                "Если факт не про то, о чём спрашивают — скажи «этого нет в базе» и предложи передать модератору."
+            )
         else:
-            kb_block = "В базе знаний нет релевантных фактов по этому запросу. Отвечай из общих знаний об онбординге или честно скажи, что нужно уточнить."
+            kb_block = (
+                "В базе знаний нет релевантных фактов по этому запросу. "
+                "НЕ придумывай ответ. Скажи честно, что этого нет в базе, и предложи передать вопрос модератору."
+            )
 
         role = profile.get("role") or "не указана"
         circle = profile.get("circle") or "не указан"
@@ -690,12 +712,10 @@ class StreamlitChatService:
 
         system = (
             "Ты Buddy — неформальный друг новичка в компании PravoTech. "
-            "Ты генеративный ИИ, обучающийся на базе знаний: сам решаешь, когда смотреть в базу, а когда просто общаться. "
-            "База знаний пополняется модератором — новые ответы ты будешь использовать в следующих диалогах. "
-            "Вопрос про компанию, процессы, аббревиатуры — используй факты из базы. "
-            "Приветствие, благодарность, «что дальше» — общайся живым языком. "
-            "Не копируй факты дословно. Не придумывай людей и контакты. "
-            "Если в базе нет ответа — честно скажи и предложи передать вопрос модератору.\n\n"
+            "Вопросы про компанию, процессы, аббревиатуры, термины — отвечай ТОЛЬКО из фактов базы знаний. Не придумывай. "
+            "Если в базе нет ответа — скажи честно «этого нет в базе» и предложи передать вопрос модератору. "
+            "Приветствие, благодарность, «как дела», «что дальше» — общайся свободно. "
+            "Не копируй факты дословно. Не придумывай людей и контакты.\n\n"
             f"Профиль: роль={role}, круг={circle}. Выполнено: {', '.join(done) or 'ничего'}. {nt}\n\n"
             f"{kb_block}"
         )
