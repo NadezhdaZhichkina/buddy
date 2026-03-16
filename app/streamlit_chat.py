@@ -261,6 +261,32 @@ def _get_streamlit_db_url() -> str:
     return f"sqlite:///{db_path}"
 
 
+def _notify_mattermost_new_ticket(ticket_id: int, question: str, requester: str) -> None:
+    """Опционально: отправить уведомление о новом тикете в Mattermost. Если не настроено — ничего не делать."""
+    base_url = (os.getenv("MATTERMOST_BASE_URL") or "").strip()
+    token = (os.getenv("MATTERMOST_BOT_TOKEN") or "").strip()
+    channel_id = (os.getenv("MATTERMOST_MODERATOR_CHANNEL_ID") or "").strip()
+    if not all([base_url, token, channel_id]):
+        return
+    short_q = (question or "")[:200] + ("..." if len(question or "") > 200 else "")
+    text = f"Новый тикет #{ticket_id} от @{requester}:\n\n{short_q}"
+    payload = json.dumps({"channel_id": channel_id, "message": text}).encode("utf-8")
+    req = urlrequest.Request(
+        f"{base_url.rstrip('/')}/api/v4/posts",
+        data=payload,
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    try:
+        with urlrequest.urlopen(req, timeout=10) as resp:
+            resp.read()
+    except (urlerror.URLError, urlerror.HTTPError, TimeoutError):
+        pass
+
+
 class StreamlitChatService:
     def __init__(self, openrouter_api_key: str = "", openrouter_model: str = "openai/gpt-4.1-mini") -> None:
         db_url = _get_streamlit_db_url()
