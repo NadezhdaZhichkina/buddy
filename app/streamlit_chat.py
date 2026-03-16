@@ -425,6 +425,8 @@ class StreamlitChatService:
             row = db.get(ModerationTicket, int(ticket_id))
             if not row:
                 return None
+            ticket_id_val = int(row.id)
+            question_text = row.question
 
             row.draft_answer = None
             row.final_answer = final_answer
@@ -458,8 +460,6 @@ class StreamlitChatService:
             db.commit()
 
         # Гарантия обучения: проверяем в новой сессии, что пара вопрос-ответ реально в БЗ.
-        ticket_id_val = int(row.id)
-        question_text = row.question
         with self.SessionLocal() as db2:
             verified_row = (
                 db2.query(KnowledgeItem).filter(KnowledgeItem.question == question_text).first()
@@ -480,7 +480,7 @@ class StreamlitChatService:
                 knowledge_id = int(verified_row.id)
 
         return {
-            "ticket_id": int(row.id),
+            "ticket_id": ticket_id_val,
             "knowledge_action": action,
             "knowledge_id": knowledge_id,
             "tags": final_tags,
