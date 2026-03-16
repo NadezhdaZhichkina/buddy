@@ -19,55 +19,78 @@ st.set_page_config(
 )
 
 # Инициализация при первом запуске
-try:
-    from app.onboarding import ROLE_DISPLAY, extract_role_from_message, get_display_role
-    from app.streamlit_chat import StreamlitChatService
+from app.onboarding import ROLE_DISPLAY, extract_role_from_message, get_display_role
+from app.streamlit_chat import StreamlitChatService
 
-    def _get_secret(name: str, default: str = "") -> str:
-        try:
-            secrets = getattr(st, "secrets", None)
-            if secrets is None:
-                return default
-            val = secrets.get(name, default)
-            return str(val) if val is not None else default
-        except Exception:
+
+def _get_secret(name: str, default: str = "") -> str:
+    try:
+        secrets = getattr(st, "secrets", None)
+        if secrets is None:
             return default
+        val = secrets.get(name, default)
+        return str(val) if val is not None else default
+    except Exception:
+        return default
 
-    def _get_openrouter_api_key() -> str:
-        variants = [
-            "OPENROUTER_API_KEY",
-            "openrouter_api_key",
-            "OPEN_ROUTER_API_KEY",
-        ]
-        for k in variants:
-            v = _get_secret(k, "").strip()
-            if v:
-                return v
-        return os.getenv("OPENROUTER_API_KEY", "").strip()
 
-    def _get_openrouter_model() -> str:
-        variants = [
-            "OPENROUTER_MODEL",
-            "openrouter_model",
-        ]
-        for k in variants:
-            v = _get_secret(k, "").strip()
-            if v:
-                return v
-        return os.getenv("OPENROUTER_MODEL", "openai/gpt-4.1-mini").strip()
+def _get_openrouter_api_key() -> str:
+    variants = ["OPENROUTER_API_KEY", "openrouter_api_key", "OPEN_ROUTER_API_KEY"]
+    for k in variants:
+        v = _get_secret(k, "").strip()
+        if v:
+            return v
+    return os.getenv("OPENROUTER_API_KEY", "").strip()
 
-    resolved_key = _get_openrouter_api_key()
-    resolved_model = _get_openrouter_model()
 
-    service = StreamlitChatService(
-        openrouter_api_key=resolved_key,
-        openrouter_model=resolved_model,
+def _get_openrouter_model() -> str:
+    variants = ["OPENROUTER_MODEL", "openrouter_model"]
+    for k in variants:
+        v = _get_secret(k, "").strip()
+        if v:
+            return v
+    return os.getenv("OPENROUTER_MODEL", "openai/gpt-4.1-mini").strip()
+
+
+_resolved_key = _get_openrouter_api_key()
+_resolved_model = _get_openrouter_model()
+
+# Подключение к БД: если PostgreSQL не работает — fallback на SQLite
+_service = None
+_init_error = None
+
+try:
+    _service = StreamlitChatService(
+        openrouter_api_key=_resolved_key,
+        openrouter_model=_resolved_model,
     )
 except Exception as e:
-    import traceback
-    st.error(f"Ошибка инициализации: {e}")
-    st.code(traceback.format_exc(), language=None)
-    st.stop()
+    _init_error = e
+    # Fallback: временно отключаем PostgreSQL, пробуем SQLite
+    _old_db = os.environ.pop("STREAMLIT_DATABASE_URL", None)
+    _old_db2 = os.environ.pop("DATABASE_URL", None)
+    try:
+        _service = StreamlitChatService(
+            openrouter_api_key=_resolved_key,
+            openrouter_model=_resolved_model,
+        )
+        st.warning(
+            "⚠️ Не удалось подключиться к PostgreSQL — используется локальный SQLite. "
+            "Данные не сохранятся между перезапусками. Ошибка: " + str(_init_error)
+        )
+    except Exception as e2:
+        import traceback
+        st.error(f"Ошибка инициализации: {_init_error}")
+        st.caption("Повторная попытка с SQLite также не удалась:")
+        st.code(traceback.format_exc(), language=None)
+        st.stop()
+    finally:
+        if _old_db is not None:
+            os.environ["STREAMLIT_DATABASE_URL"] = _old_db
+        if _old_db2 is not None:
+            os.environ["DATABASE_URL"] = _old_db2
+
+service = _service
 
 QUESTION_WORDS = (
     "как",
